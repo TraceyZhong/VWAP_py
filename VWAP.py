@@ -1,10 +1,13 @@
-from sklearn.linear_model import Lasso
 import numpy as np
+import pandas as pd
+
 from datetime import datetime
 from datetime import timedelta
-import pandas as pd
+
 import scipy.interpolate
+from sklearn.linear_model import Lasso
 from statsmodels.tsa.arima_model import ARMA
+
 import warnings
 from os import listdir
 
@@ -60,8 +63,7 @@ class VWAP(object):
 
     HALFTIME = timedelta(hours = 2)
 
-    def __init__(self, interval, trade_id, today_for_test, lasso_lambda = 812314, 
-                n_tick_threshold = 1000, data_path = './VWAP_data_path/'):
+    def __init__(self, interval, ticker, today_for_test, kwargs):
         '''
         construct a new 'VWAP' object.
         '''
@@ -70,29 +72,32 @@ class VWAP(object):
         
         # check tradeID is valid
 
-        self.TODAY = datetime.today()
+        self.TODAY = kwargs['TODAY']
         self.TODAY = datetime.strptime(today_for_test, "%Y-%m-%d")  # Tracey to notice
+        # self.T_START_TIME = kwargs['T_START_TIME']
         self.T_START_TIME = self.TODAY.replace(hour = 9, minute = 30, second = 0, microsecond = 0)
-        self.T_END_TIME = self.TODAY.replace(hour = 15, minute = 0, second = 0, microsecond = 0)
-        self.LASSO_LAMBDA = lasso_lambda
-        self.N_TICK_THRESHOLD = n_tick_threshold
-        self.data_path = data_path
-        self.data_path = './data_path/' # Tracey to notice
-        self.files = set([ filename for filename in listdir(self.data_path) if filename.endswith( '.csv' ) ])
+        # self.T_END_TIME = kwargs['T_END_TIME']
+        self.T_END_TIME = self.TODAY.replace(hour = 15, minute = 00, second = 0, microsecond = 0)
+        self.LASSO_LAMBDA = kwargs['LASSO_LAMBDA']
+        self.N_TICK_THRESHOLD = kwargs['N_TICK_THRESHOLD']
+        self.DATA_PATH = kwargs['DATA_PATH'] + ticker
+        self.DATA_PATH = './data_path/' # Tracey to notice
+        self.files = set([ filename for filename in listdir(self.DATA_PATH) if filename.endswith( '.csv' ) ])
         self.interval = interval
         self.INTERVAL = timedelta(seconds = self.interval)
         self.nINTERVAL = 2 * int(self.HALFTIME / self.INTERVAL)
         self.pre_days = 0
         self.features_to_train = np.ones((11,3),dtype=float) # CA, M, L, A
         self.intraday_percentage = [1 / self.nINTERVAL] * self.nINTERVAL  # notice .sum() =self.nINTERVAL
-        self.AR_pars = np.array([1,0],dtype =float) # (u and p)
+        # self.AR_pars = np.array([1,0],dtype =float) # (u and phi)
+        self.AR_pars = [0., 1.] 
         self.trad_volume = np.full((10,self.nINTERVAL),0, dtype=float)  # historical trading volume
         self.CAtoday = 0.
         self.predV = 0.
         self.is_V_predicted = 0
         self.last_update = 0
         self.iter = 0       
-        self.DateTime_index = ( [str(dt) for dt in datetime_range(self.T_START_TIME, 
+        self.datetime_index = ( [str(dt) for dt in datetime_range(self.T_START_TIME, 
                                 self.T_START_TIME.replace(hour = 11, minute = 30, second = 0, 
                                 microsecond = 0),timedelta(seconds = self.interval))] + 
                                 [str(dt) for dt in datetime_range(self.T_START_TIME.replace(hour = 13, 
@@ -122,7 +127,7 @@ class VWAP(object):
             
 
             # filename = str(history_date.strftime('%Y-%m-%d'))+'.csv' ## Tracey to notice
-            filename = str(trade_id) + str(history_date.strftime('%Y-%m-%d'))+'.csv' ## Tracey to notice
+            filename = str(ticker) + str(history_date.strftime('%Y-%m-%d'))+'.csv' ## Tracey to notice
             if filename in self.files:
                 self.files.remove(filename)
             else:
@@ -130,7 +135,7 @@ class VWAP(object):
 
 
             try:
-                dat = pd.read_csv(self.data_path+filename)
+                dat = pd.read_csv(self.DATA_PATH+filename)
             except Exception:
                 print('Error in reading ' + filename + ', go to the previous day.')
                 continue
@@ -192,14 +197,14 @@ class VWAP(object):
                 continue
             
             # filename = str(history_date.strftime('%Y-%m-%d'))+'.csv' ## Tracey to notice
-            filename = str(trade_id) + str(history_date.strftime('%Y-%m-%d'))+'.csv' ## Tracey to notice
+            filename = str(ticker) + str(history_date.strftime('%Y-%m-%d'))+'.csv' ## Tracey to notice
             if filename in self.files:
                 self.files.remove(filename)
             else:
                 continue
 
             try:
-                dat = pd.read_csv(self.data_path+filename)
+                dat = pd.read_csv(self.DATA_PATH+filename)
             except Exception:
                 print('Error in reading ' + filename + ', go to the previous day.')
                 continue
@@ -212,7 +217,7 @@ class VWAP(object):
                 warnings.warn('Lack historical data. Time span of data for predicting total trading volume of today has exceeded 30 days.')        
             
             try:
-                dat = pd.read_csv(self.data_path+filename)
+                dat = pd.read_csv(self.DATA_PATH+filename)
                 dat.columns = ['DateTime','Volume']
                 self.H_START_TIME = history_date.replace(hour = 9, minute = 30, second = 0, microsecond = 0)
                 dat.DateTime = [datetime.strptime(str(history_date.strftime('%Y-%m-%d')) + ' ' + dt, 
@@ -235,11 +240,11 @@ class VWAP(object):
         self.predv[0] = float(intraday_mean[0])
         self.intraday_percentage = list(np.divide(intraday_mean, intraday_mean.sum()) * self.nINTERVAL)
         self.predp[0] = self.intraday_percentage[0] / self.nINTERVAL
-        self.VWAP_log[self.DateTime_index[0]] = get_log(None, self.predv[0], self.predp[0])         
+        self.VWAP_log[self.datetime_index[0]] = get_log(None, self.predv[0], self.predp[0])         
         
         # compute AR
         arma = ARMA(self.trad_volume[-1]/self.intraday_percentage, order = (1,0))
-        self.AR_pars = arma.fit().params
+        self.AR_pars = arma.fit().params.tolist()
 
     def pred_V(self):
         if self.CAtoday == 0:
@@ -254,13 +259,13 @@ class VWAP(object):
         self.is_V_predicted = 1
         print('finish: pred_V')
 
-    def push_tick(self, DateTime, volume):
-        if DateTime < self.T_START_TIME:
+    def push_tick(self, date_time, volume):
+        if date_time < self.T_START_TIME:
             self.CAtoday += volume
-        elif DateTime < self.T_END_TIME: 
+        elif date_time < self.T_END_TIME: 
             if not self.is_V_predicted:
                 self.pred_V()
-            iter = int((DateTime - self.T_START_TIME) /self.INTERVAL)
+            iter = int((date_time - self.T_START_TIME) / self.INTERVAL)
             # if iter >= int(self.nINTERVAL * 11 / 8):
             #     iter = int(self.nINTERVAL * 11 / 8) - 1
             if iter > (self.nINTERVAL / 2):
@@ -270,41 +275,59 @@ class VWAP(object):
             if self.iter == self.last_update:
                 pass
             elif self.iter - self.last_update == 1:
-                self.VWAP_log[self.DateTime_index[self.last_update]] = get_log(self.today_vol[self.last_update], self.predv[self.last_update], self.predp[self.last_update])
+                self.VWAP_log[self.datetime_index[self.last_update]] = get_log(self.today_vol[self.last_update], self.predv[self.last_update], self.predp[self.last_update])
                 self.predv[self.iter] = int ((self.AR_pars[1] * (self.today_vol[self.last_update] / self.intraday_percentage[self.last_update] - self.AR_pars[0] ) + self.AR_pars[0] ) * self.intraday_percentage[self.iter])
                 if self.iter < (self.nINTERVAL - 1):
                     self.predp[self.iter] = self.predv[self.iter] * (1 - sum(self.predp[0:self.iter])) / (self.predV * (1 - sum(self.intraday_percentage[0:self.iter])/ self.nINTERVAL ))
                 else:
                     self.predp[self.nINTERVAL - 1] = 1 - sum(self.predp[0:(self.nINTERVAL - 1)])
-                self.VWAP_log[self.DateTime_index[self.iter]] = get_log(None, self.predv[self.iter], self.predp[self.iter])
+                self.VWAP_log[self.datetime_index[self.iter]] = get_log(None, self.predv[self.iter], self.predp[self.iter])
                 self.last_update = self.iter
             elif self.iter - self.last_update > 1:
                 warnings.warn('Over %d secs without receiving data' % self.interval)
                 self.today_vol[iter] =+ volume
                 self.today_vol[self.last_update:self.iter] = [a + b for a, b in zip(self.today_vol[self.last_update:self.iter], [volume * s / sum(self.intraday_percentage[self.last_update:self.iter]) for s in self.intraday_percentage[self.last_update:self.iter]])]
                 for i in range(self.last_update, self.iter):
-                    self.VWAP_log[self.DateTime_index[i]] = get_log(self.today_vol[i], self.predv[i], self.predp[i])
+                    self.VWAP_log[self.datetime_index[i]] = get_log(self.today_vol[i], self.predv[i], self.predp[i])
                     self.predv[i + 1] = int ((self.AR_pars[1] * (self.today_vol[i] / self.intraday_percentage[i] - self.AR_pars[0] ) + self.AR_pars[0] ) * self.intraday_percentage[i + 1]) 
                     if i + 1 < (self.nINTERVAL - 1):
                         self.predp[i + 1] = self.predv[i + 1] * (1 - sum(self.predp[0:(i + 1)])) / (self.predV * (1 - sum(self.intraday_percentage[0:(i + 1)])/ self.nINTERVAL ))
                     else:
                         self.predp[self.nINTERVAL - 1] = 1 - sum(self.predp[0:(self.nINTERVAL - 1)])
-                    self.VWAP_log[self.DateTime_index[i + 1]] = get_log(None, self.predv[i + 1], self.predp[i + 1])
+                    self.VWAP_log[self.datetime_index[i + 1]] = get_log(None, self.predv[i + 1], self.predp[i + 1])
                 self.last_update = self.iter                    
             else: # when self.iter < self.last_update, we only update real volume
                 pass
         else:
             self.today_vol[self.nINTERVAL - 1] += volume 
-            self.VWAP_log[self.DateTime_index[self.nINTERVAL - 1]] = get_log(self.today_vol[self.nINTERVAL - 1], self.predv[self.nINTERVAL - 1], self.predp[self.nINTERVAL - 1])
-            
+            self.VWAP_log[self.datetime_index[self.nINTERVAL - 1]] = get_log(self.today_vol[self.nINTERVAL - 1], self.predv[self.nINTERVAL - 1], self.predp[self.nINTERVAL - 1])            
 
     def get_predict(self):
         return(self.VWAP_log)
 
-a = VWAP(300,'SH000019','2017-02-20')
+
+
+
+lasso_lambda = 812314
+n_tick_threshold = 1000 
+data_path = './VWAP_data_path/'
+
+params = {
+    'TODAY': datetime.today(),
+    'T_START_TIME': datetime.today().replace(hour = 9, minute = 30, second = 0, microsecond = 0),
+    'T_END_TIME': datetime.today().replace(hour = 15, minute = 0, second = 0, microsecond = 0),
+    'LASSO_LAMBDA': lasso_lambda,
+    'N_TICK_THRESHOLD': n_tick_threshold,
+    'DATA_PATH': data_path  
+}
+
+print(len([300,'SH000019','2017-02-20', params]))
+
+a = VWAP(300,'SH000019','2017-02-20', params)
+
 print('DoneVWAP')
 
-df = pd.read_csv(a.data_path + "SH0000192017-02-20.csv")
+df = pd.read_csv(a.DATA_PATH + "SH0000192017-02-20.csv")
 df.columns = ['DateTime','Volume']
 
 def toInput(t):
