@@ -60,7 +60,8 @@ class VWAP(object):
 
     HALFTIME = timedelta(hours = 2)
 
-    def __init__(self, interval, trade_id, today_for_test, lasso_lambda = 812314, n_tick_threshold = 1000, data_path = './VWAP_data_path/'):
+    def __init__(self, interval, trade_id, today_for_test, lasso_lambda = 812314, 
+                n_tick_threshold = 1000, data_path = './VWAP_data_path/'):
         '''
         construct a new 'VWAP' object.
         '''
@@ -91,15 +92,20 @@ class VWAP(object):
         self.is_V_predicted = 0
         self.last_update = 0
         self.iter = 0       
-        self.DateTime_index = ( [str(dt) for dt in datetime_range(self.T_START_TIME, self.T_START_TIME.replace(hour = 11, minute = 30, second = 0, microsecond = 0),timedelta(seconds = self.interval))] + 
-        [str(dt) for dt in datetime_range(self.T_START_TIME.replace(hour = 13, minute = 0, second = 0, microsecond = 0), self.T_END_TIME,timedelta(seconds = self.interval))])
+        self.DateTime_index = ( [str(dt) for dt in datetime_range(self.T_START_TIME, 
+                                self.T_START_TIME.replace(hour = 11, minute = 30, second = 0, 
+                                microsecond = 0),timedelta(seconds = self.interval))] + 
+                                [str(dt) for dt in datetime_range(self.T_START_TIME.replace(hour = 13, 
+                                minute = 0, second = 0, microsecond = 0), 
+                                self.T_END_TIME,timedelta(seconds = self.interval))])
         self.today_vol = [0.] * self.nINTERVAL
         self.predp = [0.] * self.nINTERVAL
         self.predv = [0] * self.nINTERVAL
         self.VWAP_log ={}
         
         history_date = self.TODAY
-        x_output = np.append(np.arange(0 + self.interval , 7200 + self.interval, self.interval), np.arange(12600 + self.interval,19800 + self.interval,self.interval))
+        x_output = np.append(np.arange(0 + self.interval , 7200 + self.interval, self.interval), 
+                            np.arange(12600 + self.interval,19800 + self.interval,self.interval))
         iter = 1
         
         # get data for intraday prediction
@@ -209,7 +215,8 @@ class VWAP(object):
                 dat = pd.read_csv(self.data_path+filename)
                 dat.columns = ['DateTime','Volume']
                 self.H_START_TIME = history_date.replace(hour = 9, minute = 30, second = 0, microsecond = 0)
-                dat.DateTime = [datetime.strptime(str(history_date.strftime('%Y-%m-%d')) + ' ' + dt, "%Y-%m-%d %H:%M:%S") for dt in dat.DateTime]
+                dat.DateTime = [datetime.strptime(str(history_date.strftime('%Y-%m-%d')) + ' ' + dt, 
+                                                        "%Y-%m-%d %H:%M:%S") for dt in dat.DateTime]
                 volume_sums[15 - iter] = dat[dat.DateTime > self.H_START_TIME].Volume.sum()
             except Exception:
                 print('Error when read file '+ filename + ', you may check its format')
@@ -247,7 +254,7 @@ class VWAP(object):
         self.is_V_predicted = 1
         print('finish: pred_V')
 
-    def push_tick(self, date_time, volume):
+    def push_tick(self, DateTime, volume):
         if DateTime < self.T_START_TIME:
             self.CAtoday += volume
         elif DateTime < self.T_END_TIME: 
