@@ -315,10 +315,10 @@ class VWAP(object):
 
         if sec_time < 0 or sec_time >=  self.T_END_SECS:
             return 0.
-
+        
         else:
-            iter = int(sec_time / self._interval)
-            return self._p_per[iter]
+            self.push_tick(nano, 0)
+            return self._p_per[self._last_update]
 
     def push_tick(self, nano, cum_volume):
         
@@ -335,6 +335,12 @@ class VWAP(object):
         self._cum_vol = cum_volume
 
         sec_time =int(nano / 1e9 - self.T_START_SEC)
+
+        if sec_time < -900:
+            print 'Illegal nano, too early for today'
+
+        if sec_time > self.T_END_SECS:
+            print 'Illegal nano, too late for today'
 
         if sec_time < 0: # if the trade happens in call auction
             self._CA_today += volume
