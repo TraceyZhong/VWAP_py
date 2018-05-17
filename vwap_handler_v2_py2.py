@@ -225,7 +225,7 @@ class VWAP(object):
 
                 iter += 1
 
-            volume_sums = np.zeros(5,dtype=float)
+            volume_sums = np.zeros(self.N4ROLLING, dtype=float)
             while iter < (self.N4REGRESS + self.N4ROLLING + 1):
 
                 if not bool(dates):
