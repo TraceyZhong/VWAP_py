@@ -268,13 +268,13 @@ class VWAP(object):
                 iter += 1
 
             # preparing sample for predicting today's total volume
-            self.volume_to_train = self._histo_volume.sum(axis = 1)
+            self.volume_to_train = self._histo_volume.sum(axis = 1) # TODO na skip
             volume_sums = np.append(volume_sums, self.volume_to_train)
             self._features_to_train[:,1] = rolling_mean(volume_sums, self.N4ROLLING)
             self._features_to_train[:,2] = rolling_linear(volume_sums, self.N4ROLLING)
 
             # get intraday pattern and intialize intraday prediction
-            intraday_mean = self._histo_volume.mean(axis = 0)
+            intraday_mean = self._histo_volume.mean(axis = 0) # TODO na skip
             self._p_vol[0] = int(intraday_mean[0])
             # self._intraday_percentage = list(np.divide(intraday_mean, intraday_mean.sum()) * self._n_interval)
             
@@ -326,8 +326,12 @@ class VWAP(object):
             return 0.
         
         else:
-            self.push_tick(nano, 0)
-            return self._p_per[self._last_update]
+            iter = int(sec_time / self._interval)
+
+            if iter > self._am_n_interval: # in the afternoon
+                iter -= int(self._am_n_interval * 3 / 4)
+            
+            return self._p_per[iter]
 
     def push_tick(self, nano, cum_volume):
         
