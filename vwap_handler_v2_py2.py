@@ -270,8 +270,8 @@ class VWAP(object):
             # preparing sample for predicting today's total volume
             self.volume_to_train = self._histo_volume.sum(axis = 1)
             volume_sums = np.append(volume_sums, self.volume_to_train)
-            self._features_to_train[:,1] = rolling_mean(volume_sums)
-            self._features_to_train[:,2] = rolling_linear(volume_sums)
+            self._features_to_train[:,1] = rolling_mean(volume_sums, self.N4ROLLING)
+            self._features_to_train[:,2] = rolling_linear(volume_sums, self.N4ROLLING)
 
             # get intraday pattern and intialize intraday prediction
             intraday_mean = self._histo_volume.mean(axis = 0)
