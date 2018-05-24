@@ -209,8 +209,10 @@ class VWAP(object):
                     # Tracey by reviewing the data from ctp finds it impossible
                     if any( 7200 < t < 7230 for t in dat[:,0]): # tracey_to_notice
                         dat = np.vstack( (dat[dat[:, 0] < 7200], [7200, dat[(dat[:,0] >= 7200)*(dat[:,0] < 7230),1].sum()], dat[dat[:, 0] > 7230]))
-                    if any(t >= 198000 for t in dat[:,0]):
+                    if any(t >= 19800 for t in dat[:,0]):
                         dat = np.vstack((dat[dat[:, 0] < 19800], [19800,dat[dat[:,0] >= 19800,1].sum()])) # tracey to notice
+
+                    dat[-1,0] = 19800
 
                     x_input = np.append(0, dat[:,0])
                     volume_cumsum = np.append(0,dat[:,1].cumsum())
